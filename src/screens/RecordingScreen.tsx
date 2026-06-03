@@ -18,6 +18,7 @@ import { transcribeAudio } from '../services/whisperApi';
 import { classifyVoiceInput } from '../services/gptApi';
 import type { VoiceClassifyResult } from '../services/gptApi';
 import { saveRecord } from '../services/storageService';
+import { saveToCalendar } from '../services/calendarService';
 
 // @ts-ignore
 import AudioRecord from 'react-native-audio-record';
@@ -118,6 +119,25 @@ export default function RecordingScreen({ navigation }: Props) {
                 summary: classified.summary,
                 createdAt: new Date().toISOString(),
               });
+
+              if (classified.type === 'calendar' && classified.date) {
+                try {
+                  const added = await saveToCalendar(
+                    classified.summary ?? classified.content,
+                    classified.date,
+                    classified.time ?? '未指定',
+                  );
+                  if (added) {
+                    Alert.alert('✅ 已加入手機行事曆！', '', [{ text: '好的' }]);
+                    return;
+                  }
+                } catch {
+                  // fall through to show failure message
+                }
+                Alert.alert('加入行事曆失敗，已儲存在APP記錄中', '', [{ text: '好的' }]);
+                return;
+              }
+
               Alert.alert('✅ 已記錄！', '您的記錄已儲存', [{ text: '好的' }]);
             } catch {
               Alert.alert('錯誤', '儲存失敗，請重試');
@@ -228,7 +248,7 @@ export default function RecordingScreen({ navigation }: Props) {
           <Text style={styles.tabIcon}>📋</Text>
           <Text style={styles.tabText}>記錄</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tab}>
+        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('Settings')}>
           <Text style={styles.tabIcon}>⚙️</Text>
           <Text style={styles.tabText}>設定</Text>
         </TouchableOpacity>
