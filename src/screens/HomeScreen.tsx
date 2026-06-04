@@ -6,6 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
   StatusBar,
+  BackHandler,
 } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../App';
@@ -51,6 +52,10 @@ export default function HomeScreen({ navigation }: Props) {
         <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('History')}>
           <Text style={styles.tabIcon}>📋</Text>
           <Text style={styles.tabText}>記錄</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.tab} onPress={() => BackHandler.exitApp()}>
+          <Text style={styles.tabIcon}>🚪</Text>
+          <Text style={styles.tabText}>退出</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('Settings')}>
           <Text style={styles.tabIcon}>⚙️</Text>
