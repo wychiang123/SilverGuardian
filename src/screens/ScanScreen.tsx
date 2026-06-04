@@ -21,26 +21,31 @@ import { checkRateLimit } from '../services/rateLimitService';
 
 type RiskLevel = '高風險' | '中風險' | '低風險' | '資訊不足';
 
-// Recalibrated high-risk groups (investment keywords alone excluded)
+// High-risk keyword groups — ATM/分期 split into individual groups for granular scoring
 const HIGH_RISK_GROUPS: { keywords: string[]; score: number }[] = [
-  { keywords: ['ATM解除分期', '誤設分期', '解除分期付款', '解除分期', '誤設分期付款'], score: 70 },
+  { keywords: ['ATM'], score: 55 },
+  { keywords: ['解除分期', '誤設分期', '12期付款', '錯誤設定'], score: 45 },
   { keywords: ['匯款', '轉帳'], score: 60 },
   { keywords: ['驗證碼', '個資蒐集', '帳戶密碼', '身份證字號'], score: 55 },
   { keywords: ['假冒銀行', '假冒檢警', '假冒政府', '冒充警察', '冒充銀行'], score: 60 },
   { keywords: ['保證獲利', '保證賺錢', '穩賺', '零風險獲利'], score: 50 },
   { keywords: ['中獎', '領獎', '手續費'], score: 40 },
-  { keywords: ['ATM'], score: 35 },
 ];
 
 // Anchors: if present, whitelist cap is bypassed
 const HIGH_RISK_ANCHORS = ['匯款', '轉帳', 'ATM', '驗證碼', '假冒', '冒充'];
 
-// Whitelist groups (negative scores — legitimate message patterns)
+// Used for 資訊不足 safe-content detection
+const FINANCIAL_DEMAND_KEYWORDS = ['匯款', '轉帳', 'ATM'];
+const PERSONAL_DATA_KEYWORDS = ['驗證碼', '帳號', '密碼', '身份證'];
+const URL_PATTERNS = ['http', 'www.', '.com', '.tw', '://'];
+const INVESTMENT_LOAN_KEYWORDS = ['投資', '貸款'];
+
+// Whitelist groups — meeting/general-notice removed; handled via 資訊不足 instead
 const WHITELIST_GROUPS: { keywords: string[]; score: number }[] = [
   { keywords: ['刷卡消費', '消費通知', '帳單通知', '消費明細', '信用卡帳單'], score: -40 },
   { keywords: ['門診提醒', '掛號通知', '醫院通知', '看診提醒', '回診提醒', '門診', '醫院', '掛號', '看診', '回診', '預約'], score: -40 },
   { keywords: ['物流通知', '包裹到達', '配送通知', '到貨通知', '取件通知', '配送', '取件', '包裹'], score: -30 },
-  { keywords: ['會議通知', '公司通知', '學校通知', '課程通知', '行程提醒'], score: -30 },
   { keywords: ['好久不見', '最近好嗎', '吃飯了嗎', '在哪裡呢'], score: -30 },
   { keywords: ['水電費', '電信帳單', '電費通知', '水費通知', '瓦斯帳單', '電費', '水費', '瓦斯費'], score: -35 },
 ];
@@ -53,6 +58,11 @@ interface RuleEngineResult {
   whitelistCap: number | null;
   hasHighRiskKeyword: boolean;
   hasInsufficientInfoPattern: boolean;
+  hasFinancialDemand: boolean;
+  hasPersonalDataDemand: boolean;
+  hasUrl: boolean;
+  hasInvestmentOrLoan: boolean;
+  hasWhitelistMatch: boolean;
 }
 
 function runRuleEngine(text: string): RuleEngineResult {
@@ -71,9 +81,12 @@ function runRuleEngine(text: string): RuleEngineResult {
 
   // Combination bonus rules (applied after individual scores)
   const inc = (kw: string) => text.includes(kw);
-  if (inc('ATM') && (inc('解除分期') || inc('誤設分期'))) { score += 30; }
-  if (inc('匯款') && (inc('客服') || inc('退款')))         { score += 25; }
-  if (inc('驗證碼') && (inc('帳戶') || inc('密碼')))       { score += 25; }
+  const hasAtm = inc('ATM');
+  const hasInstalment = inc('解除分期') || inc('誤設分期') || inc('12期付款') || inc('錯誤設定');
+  if (hasAtm && hasInstalment)                              { score += 35; }
+  if (hasAtm && (inc('30分鐘') || inc('30分鐘內') || inc('限時'))) { score += 25; }
+  if (inc('匯款') && (inc('客服') || inc('退款')))          { score += 25; }
+  if (inc('驗證碼') && (inc('帳戶') || inc('密碼')))        { score += 25; }
 
   for (const group of WHITELIST_GROUPS) {
     if (group.keywords.some(kw => text.includes(kw))) {
@@ -87,13 +100,16 @@ function runRuleEngine(text: string): RuleEngineResult {
     score = Math.min(score, whitelistCap);
   }
 
-  const hasInsufficientInfoPattern = INSUFFICIENT_INFO_KEYWORDS.some(kw => text.includes(kw));
-
   return {
     score: Math.max(0, Math.min(score, 100)),
     whitelistCap,
     hasHighRiskKeyword,
-    hasInsufficientInfoPattern,
+    hasInsufficientInfoPattern: INSUFFICIENT_INFO_KEYWORDS.some(kw => text.includes(kw)),
+    hasFinancialDemand: FINANCIAL_DEMAND_KEYWORDS.some(kw => text.includes(kw)),
+    hasPersonalDataDemand: PERSONAL_DATA_KEYWORDS.some(kw => text.includes(kw)),
+    hasUrl: URL_PATTERNS.some(p => text.includes(p)),
+    hasInvestmentOrLoan: INVESTMENT_LOAN_KEYWORDS.some(kw => text.includes(kw)),
+    hasWhitelistMatch,
   };
 }
 
@@ -107,11 +123,24 @@ function computeFinalResult(
   rule: RuleEngineResult,
   ai: ScamAnalysisResult,
 ): { riskLevel: RiskLevel; finalScore: number } {
-  const { score: ruleScore, whitelistCap, hasHighRiskKeyword, hasInsufficientInfoPattern } = rule;
+  const {
+    score: ruleScore, whitelistCap, hasHighRiskKeyword, hasInsufficientInfoPattern,
+    hasFinancialDemand, hasPersonalDataDemand, hasUrl, hasInvestmentOrLoan, hasWhitelistMatch,
+  } = rule;
+
+  // 資訊不足 trigger: safe general content with no risk signals and weak scores
+  const isGeneralSafeContent =
+    !hasFinancialDemand &&
+    !hasPersonalDataDemand &&
+    !hasUrl &&
+    !hasInvestmentOrLoan &&
+    ruleScore < 20 &&
+    (ai.ai_score < 50 || hasWhitelistMatch);
 
   // 資訊不足: checked FIRST, before score thresholds
   const isInsufficientInfo =
     hasInsufficientInfoPattern ||
+    isGeneralSafeContent ||
     (ruleScore < 20 && ai.confidence < 50) ||
     (!hasHighRiskKeyword && ai.confidence < 40);
 
