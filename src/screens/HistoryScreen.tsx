@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
@@ -113,19 +113,37 @@ export default function HistoryScreen({ navigation }: Props) {
         <View style={styles.headerSpacer} />
       </View>
 
-      <FlatList
-        data={records}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
+      <ScrollView
         contentContainerStyle={records.length === 0 ? styles.emptyContainer : styles.listContent}
-        ListEmptyComponent={
+        showsVerticalScrollIndicator={false}
+      >
+        {records.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyIcon}>📭</Text>
             <Text style={styles.emptyText}>尚無記錄</Text>
             <Text style={styles.emptySubText}>說話或拍照後，記錄會出現在這裡</Text>
           </View>
-        }
-      />
+        ) : (
+          records.map(item => (
+            <React.Fragment key={item.id}>{renderItem({ item })}</React.Fragment>
+          ))
+        )}
+      </ScrollView>
+
+      <View style={styles.tabBar}>
+        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('Home')}>
+          <Text style={styles.tabIcon}>🏠</Text>
+          <Text style={styles.tabText}>首頁</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tab, styles.tabActive]}>
+          <Text style={styles.tabIcon}>📋</Text>
+          <Text style={[styles.tabText, styles.tabTextActive]}>記錄</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('Settings')}>
+          <Text style={styles.tabIcon}>⚙️</Text>
+          <Text style={styles.tabText}>設定</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -162,10 +180,12 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    paddingBottom: 88,
     gap: 16,
   },
   emptyContainer: {
     flex: 1,
+    paddingBottom: 72,
   },
   emptyBox: {
     flex: 1,
@@ -245,5 +265,37 @@ const styles = StyleSheet.create({
   },
   deleteIcon: {
     fontSize: 28,
+  },
+  tabBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingVertical: 8,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  tabActive: {
+    borderTopWidth: 3,
+    borderTopColor: '#1b5e20',
+  },
+  tabIcon: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  tabText: {
+    fontSize: 18,
+    color: '#333',
+  },
+  tabTextActive: {
+    color: '#1b5e20',
+    fontWeight: 'bold',
   },
 });
