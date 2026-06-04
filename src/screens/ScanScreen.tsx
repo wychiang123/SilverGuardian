@@ -135,13 +135,15 @@ function computeFinalResult(
     hasUrl, hasInvestmentOrLoan, hasGeneralNotification,
   } = rule;
 
-  // 資訊不足 trigger: notification-type content with zero risk signals — no aiScore dependency
+  // 資訊不足 trigger: high-risk check FIRST — any risk signal skips this path entirely
+  const ocrLength = (ai.ocr_text ?? '').length;
   const isGeneralSafeContent =
-    !hasHighRiskKeyword &&
-    !hasUrl &&
-    !hasInvestmentOrLoan &&
-    ruleScore < 20 &&
-    hasGeneralNotification;
+    !hasHighRiskKeyword &&        // 1. no high-risk keywords (checked first, highest priority)
+    !hasUrl &&                    // 2. no suspicious URL
+    !hasInvestmentOrLoan &&       // 3. no investment/loan keywords
+    ruleScore < 20 &&             // 4. weak rule signal
+    hasGeneralNotification &&     // 5. contains general notification words
+    ocrLength < 100;              // 6. short text only — long text is likely scam script
 
   // 資訊不足: checked FIRST, before score thresholds
   const isInsufficientInfo =
