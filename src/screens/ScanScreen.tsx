@@ -69,6 +69,12 @@ function runRuleEngine(text: string): RuleEngineResult {
 
   const hasHighRiskAnchor = HIGH_RISK_ANCHORS.some(kw => text.includes(kw));
 
+  // Combination bonus rules (applied after individual scores)
+  const inc = (kw: string) => text.includes(kw);
+  if (inc('ATM') && (inc('解除分期') || inc('誤設分期'))) { score += 30; }
+  if (inc('匯款') && (inc('客服') || inc('退款')))         { score += 25; }
+  if (inc('驗證碼') && (inc('帳戶') || inc('密碼')))       { score += 25; }
+
   for (const group of WHITELIST_GROUPS) {
     if (group.keywords.some(kw => text.includes(kw))) {
       score += group.score;
