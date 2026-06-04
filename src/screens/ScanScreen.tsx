@@ -44,18 +44,25 @@ const WHITELIST_GROUPS: { keywords: string[]; score: number }[] = [
   { keywords: ['水電費', '電信帳單', '電費通知', '水費通知', '瓦斯帳單'], score: -35 },
 ];
 
+// Keywords that signal ambiguous/incomplete content → 資訊不足
+const INSUFFICIENT_INFO_KEYWORDS = ['文件確認', '補件通知', '身分不明', '不完整通知'];
+
 interface RuleEngineResult {
   score: number;
   whitelistCap: number | null;
+  hasHighRiskKeyword: boolean;
+  hasInsufficientInfoPattern: boolean;
 }
 
 function runRuleEngine(text: string): RuleEngineResult {
   let score = 0;
   let hasWhitelistMatch = false;
+  let hasHighRiskKeyword = false;
 
   for (const group of HIGH_RISK_GROUPS) {
     if (group.keywords.some(kw => text.includes(kw))) {
       score += group.score;
+      hasHighRiskKeyword = true;
     }
   }
 
@@ -73,12 +80,19 @@ function runRuleEngine(text: string): RuleEngineResult {
     score = Math.min(score, whitelistCap);
   }
 
-  return { score: Math.max(0, Math.min(score, 100)), whitelistCap };
+  const hasInsufficientInfoPattern = INSUFFICIENT_INFO_KEYWORDS.some(kw => text.includes(kw));
+
+  return {
+    score: Math.max(0, Math.min(score, 100)),
+    whitelistCap,
+    hasHighRiskKeyword,
+    hasInsufficientInfoPattern,
+  };
 }
 
 function scoreToLevel(score: number): RiskLevel {
-  if (score >= 60) return '高風險';
-  if (score >= 30) return '中風險';
+  if (score >= 70) return '高風險';
+  if (score >= 40) return '中風險';
   return '低風險';
 }
 
@@ -86,13 +100,15 @@ function computeFinalResult(
   rule: RuleEngineResult,
   ai: ScamAnalysisResult,
 ): { riskLevel: RiskLevel; finalScore: number } {
-  const { score: ruleScore, whitelistCap } = rule;
+  const { score: ruleScore, whitelistCap, hasHighRiskKeyword, hasInsufficientInfoPattern } = rule;
 
-  // 資訊不足: independent triggers, not derived from score thresholds
-  if (ruleScore < 20 && ai.confidence < 50) {
-    return { riskLevel: '資訊不足', finalScore: Math.round((ruleScore + ai.ai_score) / 2) };
-  }
-  if (ai.risk_level === '資訊不足' && ruleScore < 30) {
+  // 資訊不足: checked FIRST, before score thresholds
+  const isInsufficientInfo =
+    hasInsufficientInfoPattern ||
+    (ruleScore < 20 && ai.confidence < 50) ||
+    (!hasHighRiskKeyword && ai.confidence < 40);
+
+  if (isInsufficientInfo) {
     return { riskLevel: '資訊不足', finalScore: Math.round((ruleScore + ai.ai_score) / 2) };
   }
 
