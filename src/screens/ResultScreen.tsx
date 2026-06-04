@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   StatusBar,
   TouchableOpacity,
-  Animated,
+  ScrollView,
   Alert,
 } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -24,90 +24,103 @@ interface Props {
 
 type NotifyStatus = 'sending' | 'sent' | 'failed' | 'no_contacts';
 
+type RiskLevel = '高風險' | '中風險' | '低風險' | '資訊不足';
+
+const RISK_CONFIG: Record<RiskLevel, {
+  headerBg: string;
+  bodyBg: string;
+  accent: string;
+  icon: string;
+  label: string;
+}> = {
+  '高風險': { headerBg: '#b71c1c', bodyBg: '#fff8f8', accent: '#c62828', icon: '🚨', label: '高風險' },
+  '中風險': { headerBg: '#bf360c', bodyBg: '#fff8f0', accent: '#e65100', icon: '⚠️', label: '中風險' },
+  '低風險': { headerBg: '#1b5e20', bodyBg: '#f1f8e9', accent: '#2e7d32', icon: '✅', label: '低風險' },
+  '資訊不足': { headerBg: '#424242', bodyBg: '#f5f5f5', accent: '#616161', icon: '❓', label: '資訊不足' },
+};
+
+const NOTIFY_LABEL: Record<NotifyStatus, string> = {
+  sending: '📨 通知發送中...',
+  sent: '✅ 已發送通知給家人',
+  failed: '❌ 通知發送失敗',
+  no_contacts: '⚠️ 尚未設定家人 Email',
+};
+
 export default function ResultScreen({ navigation, route }: Props) {
-  const { isSafe, message } = route.params;
-  const blinkAnim = useRef(new Animated.Value(1)).current;
+  const { riskLevel, finalScore, evidenceHigh, evidenceLow, explanation, conclusion } = route.params;
   const [notifyStatus, setNotifyStatus] = useState<NotifyStatus>('sending');
 
-  useEffect(() => {
-    if (!isSafe) {
-      const anim = Animated.loop(
-        Animated.sequence([
-          Animated.timing(blinkAnim, {
-            toValue: 0.25,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(blinkAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ]),
-      );
-      anim.start();
-      return () => anim.stop();
-    }
-  }, [isSafe, blinkAnim]);
+  const cfg = RISK_CONFIG[riskLevel] ?? RISK_CONFIG['資訊不足'];
+  const isHighRisk = riskLevel === '高風險';
 
   useEffect(() => {
-    if (!isSafe) {
-      notifyFamily(message, message)
-        .then(sent => {
-          setNotifyStatus(sent ? 'sent' : 'no_contacts');
-        })
-        .catch((error: { message?: string; response?: { status?: number; data?: unknown } }) => {
-          setNotifyStatus('failed');
-          const status = error.response?.status ?? 'N/A';
-          const data = JSON.stringify(error.response?.data) ?? error.message ?? '無詳細資訊';
-          Alert.alert('通知發送失敗', `status: ${status}\n\n${data}`);
-        });
-    }
-  }, [isSafe, message]);
-
-  const notifyLabel: Record<NotifyStatus, string> = {
-    sending: '📨 通知發送中...',
-    sent: '✅ 已發送通知給家人',
-    failed: '❌ 通知發送失敗',
-    no_contacts: '⚠️ 尚未設定家人 Email',
-  };
-
-  if (isSafe) {
-    return (
-      <SafeAreaView style={[styles.container, styles.safeContainer]}>
-        <StatusBar backgroundColor="#2e7d32" barStyle="light-content" />
-        <View style={styles.content}>
-          <Text style={styles.resultIcon}>✅</Text>
-          <Text style={styles.safeTitle}>看起來安全</Text>
-          <Text style={styles.messageText}>{message}</Text>
-          <TouchableOpacity
-            style={styles.homeButton}
-            onPress={() => navigation.navigate('Home')}
-          >
-            <Text style={styles.homeButtonText}>回到首頁</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+    if (!isHighRisk) return;
+    notifyFamily(explanation, conclusion)
+      .then(sent => setNotifyStatus(sent ? 'sent' : 'no_contacts'))
+      .catch((error: { message?: string; response?: { status?: number; data?: unknown } }) => {
+        setNotifyStatus('failed');
+        const status = error.response?.status ?? 'N/A';
+        const data = JSON.stringify(error.response?.data) ?? error.message ?? '無詳細資訊';
+        Alert.alert('通知發送失敗', `status: ${status}\n\n${data}`);
+      });
+  }, [isHighRisk, explanation, conclusion]);
 
   return (
-    <SafeAreaView style={[styles.container, styles.dangerContainer]}>
-      <StatusBar backgroundColor="#b71c1c" barStyle="light-content" />
-      <Animated.View style={[styles.content, { opacity: blinkAnim }]}>
-        <Text style={styles.resultIcon}>🚨</Text>
-        <Text style={styles.dangerTitle}>這是詐騙！</Text>
-        <Text style={styles.messageText}>{message}</Text>
-        <View style={styles.notifyBox}>
-          <Text style={styles.notifyText}>{notifyLabel[notifyStatus]}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: cfg.bodyBg }]}>
+      <StatusBar backgroundColor={cfg.headerBg} barStyle="light-content" />
+
+      <View style={[styles.header, { backgroundColor: cfg.headerBg }]}>
+        <Text style={styles.riskIcon}>{cfg.icon}</Text>
+        <Text style={styles.riskLabel}>{cfg.label}</Text>
+        <Text style={styles.riskScore}>風險分數：{finalScore} / 100</Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
+        {isHighRisk && (
+          <View style={[styles.notifyBox, { backgroundColor: cfg.headerBg }]}>
+            <Text style={styles.notifyText}>{NOTIFY_LABEL[notifyStatus]}</Text>
+          </View>
+        )}
+
+        {evidenceHigh.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: '#c62828' }]}>🔴 支持高風險的證據</Text>
+            {evidenceHigh.map((item, i) => (
+              <Text key={i} style={styles.evidenceItem}>• {item}</Text>
+            ))}
+          </View>
+        )}
+
+        {evidenceLow.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: '#2e7d32' }]}>🟢 支持低風險的證據</Text>
+            {evidenceLow.map((item, i) => (
+              <Text key={i} style={styles.evidenceItem}>• {item}</Text>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📋 分析說明</Text>
+          <Text style={styles.bodyText}>{explanation}</Text>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>💡 結論</Text>
+          <Text style={styles.bodyText}>{conclusion}</Text>
+        </View>
+
         <TouchableOpacity
-          style={styles.homeButton}
+          style={[styles.homeButton, { backgroundColor: cfg.accent }]}
           onPress={() => navigation.navigate('Home')}
+          activeOpacity={0.8}
         >
-          <Text style={styles.homeButtonText}>回到首頁</Text>
+          <Text style={styles.homeButtonText}>🏠 回到首頁</Text>
         </TouchableOpacity>
-      </Animated.View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -116,59 +129,74 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  safeContainer: {
-    backgroundColor: '#2e7d32',
-  },
-  dangerContainer: {
-    backgroundColor: '#c62828',
-  },
-  content: {
-    flex: 1,
+  header: {
+    paddingVertical: 28,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 24,
+    gap: 8,
   },
-  resultIcon: {
-    fontSize: 100,
+  riskIcon: {
+    fontSize: 64,
   },
-  safeTitle: {
-    fontSize: 42,
+  riskLabel: {
+    fontSize: 40,
     fontWeight: 'bold',
     color: '#ffffff',
-    textAlign: 'center',
   },
-  dangerTitle: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    textAlign: 'center',
+  riskScore: {
+    fontSize: 24,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
   },
-  messageText: {
-    fontSize: 26,
-    color: '#ffffff',
-    textAlign: 'center',
-    lineHeight: 38,
-    opacity: 0.95,
+  body: {
+    padding: 20,
+    paddingBottom: 40,
+    gap: 16,
   },
   notifyBox: {
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    paddingHorizontal: 28,
+    borderRadius: 12,
+    paddingHorizontal: 20,
     paddingVertical: 14,
-    borderRadius: 10,
+    alignItems: 'center',
   },
   notifyText: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
   },
-  homeButton: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 48,
-    paddingVertical: 18,
+  section: {
+    backgroundColor: '#ffffff',
     borderRadius: 14,
-    marginTop: 12,
+    padding: 18,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  evidenceItem: {
+    fontSize: 20,
+    color: '#444',
+    lineHeight: 30,
+  },
+  bodyText: {
+    fontSize: 20,
+    color: '#444',
+    lineHeight: 32,
+  },
+  homeButton: {
+    borderRadius: 14,
+    paddingVertical: 20,
+    alignItems: 'center',
+    elevation: 3,
+    marginTop: 8,
   },
   homeButtonText: {
     color: '#ffffff',

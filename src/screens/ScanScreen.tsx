@@ -16,7 +16,45 @@ import RNFS from 'react-native-fs';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../App';
 import { analyzeScamImage } from '../services/gptApi';
+import type { ScamAnalysisResult } from '../services/gptApi';
 import { checkRateLimit } from '../services/rateLimitService';
+
+type RiskLevel = '高風險' | '中風險' | '低風險' | '資訊不足';
+
+const RULE_GROUPS: { keywords: string[]; score: number }[] = [
+  { keywords: ['匯款', '轉帳', 'ATM'], score: 40 },
+  { keywords: ['保證獲利', '保證賺錢', '穩賺'], score: 35 },
+  { keywords: ['假冒銀行', '假冒檢警', '假冒政府'], score: 40 },
+  { keywords: ['驗證碼', '信用卡資料', '帳戶密碼'], score: 35 },
+  { keywords: ['中獎', '領獎', '手續費'], score: 30 },
+  { keywords: ['投資群組', '加入LINE群', '高報酬'], score: 20 },
+  { keywords: ['不明連結', '點擊連結'], score: 20 },
+];
+
+function runRuleEngine(text: string): number {
+  let score = 0;
+  for (const group of RULE_GROUPS) {
+    if (group.keywords.some(kw => text.includes(kw))) {
+      score += group.score;
+    }
+  }
+  return Math.min(score, 100);
+}
+
+function computeFinalResult(
+  ruleScore: number,
+  ai: ScamAnalysisResult,
+): { riskLevel: RiskLevel; finalScore: number } {
+  if (ruleScore >= 60) {
+    return { riskLevel: '高風險', finalScore: Math.min(Math.round((ruleScore + ai.ai_score) / 2), 100) };
+  }
+  if (ruleScore >= 30) {
+    const finalScore = Math.round((ruleScore + ai.ai_score) / 2);
+    const level: RiskLevel = finalScore >= 70 ? '高風險' : finalScore >= 40 ? '中風險' : '低風險';
+    return { riskLevel: level, finalScore };
+  }
+  return { riskLevel: ai.risk_level, finalScore: ai.ai_score };
+}
 
 type ScanScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Scan'>;
 
@@ -42,8 +80,18 @@ export default function ScanScreen({ navigation }: Props) {
       const base64 =
         asset.base64 ?? (await RNFS.readFile(asset.uri.replace('file://', ''), 'base64'));
       await checkRateLimit();
-      const result = await analyzeScamImage(base64);
-      navigation.navigate('Result', result);
+      const aiResult = await analyzeScamImage(base64);
+      const searchText = [...aiResult.evidence_high, aiResult.explanation, aiResult.conclusion].join(' ');
+      const ruleScore = runRuleEngine(searchText);
+      const { riskLevel, finalScore } = computeFinalResult(ruleScore, aiResult);
+      navigation.navigate('Result', {
+        riskLevel,
+        finalScore,
+        evidenceHigh: aiResult.evidence_high,
+        evidenceLow: aiResult.evidence_low,
+        explanation: aiResult.explanation,
+        conclusion: aiResult.conclusion,
+      });
     } catch (error: unknown) {
       const axiosError = error as {
         message?: string;
@@ -129,8 +177,6 @@ export default function ScanScreen({ navigation }: Props) {
   };
 
   const handlePickImage = () => {
-    Alert.alert('按鈕有反應', '準備開啟相簿...');
-
     launchImageLibrary(
       { mediaType: 'photo', includeBase64: true, quality: 0.8 },
       async response => {

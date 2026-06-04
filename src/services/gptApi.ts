@@ -3,13 +3,27 @@ import Config from 'react-native-config';
 
 const OPENAI_API_KEY = Config.OPENAI_API_KEY ?? '';
 
-const SYSTEM_PROMPT = `你是台灣防詐騙專家。請分析使用者提供的圖片，判斷是否含有詐騙內容。
-分析重點：假冒政府機關、銀行或知名品牌；要求轉帳或點擊不明連結；中獎通知；威脅恐嚇語言；不合理的優惠或高報酬投資。
-請以繁體中文回覆，嚴格回傳 JSON 格式：{"isSafe": true/false, "message": "說明（50字以內）"}`;
+const SYSTEM_PROMPT = `你是台灣防詐騙分析專家。分析圖片文字內容，評估詐騙風險等級。
+不要因為出現投資、股票、理財、LINE群組、免費講座等字眼就直接判定為詐騙。
+必須根據實際內容與證據判斷。證據不足請選「資訊不足」。
 
-interface GptResult {
-  isSafe: boolean;
-  message: string;
+輸出 JSON 格式：
+{
+  "risk_level": "高風險|中風險|低風險|資訊不足",
+  "ai_score": 0-100,
+  "evidence_high": ["具體支持高風險的證據條目"],
+  "evidence_low": ["具體支持低風險的證據條目"],
+  "explanation": "分析說明（繁體中文，100字以內）",
+  "conclusion": "結論（繁體中文，50字以內）"
+}`;
+
+export interface ScamAnalysisResult {
+  risk_level: '高風險' | '中風險' | '低風險' | '資訊不足';
+  ai_score: number;
+  evidence_high: string[];
+  evidence_low: string[];
+  explanation: string;
+  conclusion: string;
 }
 
 export interface VoiceClassifyResult {
@@ -30,7 +44,7 @@ interface ChatCompletionResponse {
   }>;
 }
 
-export async function analyzeScamImage(imageBase64: string): Promise<GptResult> {
+export async function analyzeScamImage(imageBase64: string): Promise<ScamAnalysisResult> {
   const response = await axios.post<ChatCompletionResponse>(
     'https://api.openai.com/v1/chat/completions',
     {
@@ -52,13 +66,13 @@ export async function analyzeScamImage(imageBase64: string): Promise<GptResult> 
             },
             {
               type: 'text',
-              text: '請分析這張圖片是否為詐騙，以 JSON 格式回傳結果。',
+              text: '請分析這張圖片的詐騙風險，以 JSON 格式回傳結果。',
             },
           ],
         },
       ],
       response_format: { type: 'json_object' },
-      max_tokens: 256,
+      max_tokens: 512,
     },
     {
       headers: {
@@ -69,7 +83,7 @@ export async function analyzeScamImage(imageBase64: string): Promise<GptResult> 
   );
 
   const content = response.data.choices[0].message.content;
-  return JSON.parse(content) as GptResult;
+  return JSON.parse(content) as ScamAnalysisResult;
 }
 
 const CLASSIFY_SYSTEM_PROMPT = (() => {

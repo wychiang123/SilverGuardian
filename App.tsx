@@ -12,7 +12,14 @@ export type RootStackParamList = {
   Home: undefined;
   Recording: undefined;
   Scan: undefined;
-  Result: { isSafe: boolean; message: string };
+  Result: {
+    riskLevel: '高風險' | '中風險' | '低風險' | '資訊不足';
+    finalScore: number;
+    evidenceHigh: string[];
+    evidenceLow: string[];
+    explanation: string;
+    conclusion: string;
+  };
   History: undefined;
   Settings: undefined;
 };
