@@ -56,7 +56,7 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.tabIcon}>📋</Text>
           <Text style={styles.tabText}>記錄</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tab} onPress={() => { Alert.alert('測試', '準備導航到設定'); navigation.navigate('Settings'); }}>
+        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('Settings')}>
           <Text style={styles.tabIcon}>⚙️</Text>
           <Text style={styles.tabText}>設定</Text>
         </TouchableOpacity>
