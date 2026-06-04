@@ -53,6 +53,11 @@ const WHITELIST_GROUPS: { keywords: string[]; score: number }[] = [
 // Keywords that signal ambiguous/incomplete content → 資訊不足
 const INSUFFICIENT_INFO_KEYWORDS = ['文件確認', '補件通知', '身分不明', '不完整通知'];
 
+// General notification words — combined with no-risk check → 資訊不足
+const GENERAL_NOTIFICATION_KEYWORDS = [
+  '開會', '會議', '通知', '提醒', '文件', '補件', '確認', '公告', '地點', '時間', '行程',
+];
+
 interface RuleEngineResult {
   score: number;
   whitelistCap: number | null;
@@ -63,6 +68,7 @@ interface RuleEngineResult {
   hasUrl: boolean;
   hasInvestmentOrLoan: boolean;
   hasWhitelistMatch: boolean;
+  hasGeneralNotification: boolean;
 }
 
 function runRuleEngine(text: string): RuleEngineResult {
@@ -110,6 +116,7 @@ function runRuleEngine(text: string): RuleEngineResult {
     hasUrl: URL_PATTERNS.some(p => text.includes(p)),
     hasInvestmentOrLoan: INVESTMENT_LOAN_KEYWORDS.some(kw => text.includes(kw)),
     hasWhitelistMatch,
+    hasGeneralNotification: GENERAL_NOTIFICATION_KEYWORDS.some(kw => text.includes(kw)),
   };
 }
 
@@ -125,23 +132,21 @@ function computeFinalResult(
 ): { riskLevel: RiskLevel; finalScore: number } {
   const {
     score: ruleScore, whitelistCap, hasHighRiskKeyword, hasInsufficientInfoPattern,
-    hasFinancialDemand, hasPersonalDataDemand, hasUrl, hasInvestmentOrLoan, hasWhitelistMatch,
+    hasUrl, hasInvestmentOrLoan, hasGeneralNotification,
   } = rule;
 
-  // 資訊不足 trigger: safe general content with no risk signals and weak scores
+  // 資訊不足 trigger: notification-type content with zero risk signals — no aiScore dependency
   const isGeneralSafeContent =
-    !hasFinancialDemand &&
-    !hasPersonalDataDemand &&
+    !hasHighRiskKeyword &&
     !hasUrl &&
     !hasInvestmentOrLoan &&
     ruleScore < 20 &&
-    (ai.ai_score < 50 || hasWhitelistMatch);
+    hasGeneralNotification;
 
   // 資訊不足: checked FIRST, before score thresholds
   const isInsufficientInfo =
     hasInsufficientInfoPattern ||
     isGeneralSafeContent ||
-    (ruleScore < 20 && ai.confidence < 50) ||
     (!hasHighRiskKeyword && ai.confidence < 40);
 
   if (isInsufficientInfo) {
