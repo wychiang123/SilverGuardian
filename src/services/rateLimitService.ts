@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DAILY_LIMIT = 5;
+const DAILY_LIMIT = 99;
 
 function getTodayKey(): string {
   const today = new Date();
