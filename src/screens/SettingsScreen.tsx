@@ -138,14 +138,6 @@ export default function SettingsScreen({ navigation }: Props) {
           <Text style={styles.tabIcon}>🏠</Text>
           <Text style={styles.tabText}>首頁</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('History')}>
-          <Text style={styles.tabIcon}>📋</Text>
-          <Text style={styles.tabText}>記錄</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, styles.tabActive]}>
-          <Text style={styles.tabIcon}>⚙️</Text>
-          <Text style={[styles.tabText, styles.tabTextActive]}>設定</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -276,10 +268,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
   },
-  tabActive: {
-    borderTopWidth: 3,
-    borderTopColor: '#1b5e20',
-  },
   tabIcon: {
     fontSize: 28,
     marginBottom: 4,
@@ -287,9 +275,5 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 18,
     color: '#333',
-  },
-  tabTextActive: {
-    color: '#1b5e20',
-    fontWeight: 'bold',
   },
 });
