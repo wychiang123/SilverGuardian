@@ -21,6 +21,15 @@ export type RootStackParamList = {
     evidenceLow: string[];
     explanation: string;
     conclusion: string;
+    debugInfo: {
+      ocrPreview: string;
+      ruleScore: number;
+      aiScore: number;
+      whitelistCap: number | null;
+      confidence: number;
+      finalScore: number;
+      riskLevel: string;
+    };
   };
   History: undefined;
   Settings: undefined;

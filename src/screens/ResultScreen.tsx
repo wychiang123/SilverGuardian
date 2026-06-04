@@ -47,7 +47,7 @@ const NOTIFY_LABEL: Record<NotifyStatus, string> = {
 };
 
 export default function ResultScreen({ navigation, route }: Props) {
-  const { riskLevel, finalScore, confidence, needHumanReview, evidenceHigh, evidenceLow, explanation, conclusion } = route.params;
+  const { riskLevel, finalScore, confidence, needHumanReview, evidenceHigh, evidenceLow, explanation, conclusion, debugInfo } = route.params;
   const [notifyStatus, setNotifyStatus] = useState<NotifyStatus>('sending');
 
   const cfg = RISK_CONFIG[riskLevel] ?? RISK_CONFIG['資訊不足'];
@@ -138,6 +138,17 @@ export default function ResultScreen({ navigation, route }: Props) {
         >
           <Text style={styles.homeButtonText}>🏠 回到首頁</Text>
         </TouchableOpacity>
+
+        <View style={styles.debugBox}>
+          <Text style={styles.debugTitle}>Debug 資訊</Text>
+          <Text style={styles.debugLine}>OCR: {debugInfo.ocrPreview}</Text>
+          <Text style={styles.debugLine}>Rule Score: {debugInfo.ruleScore}</Text>
+          <Text style={styles.debugLine}>AI Score: {debugInfo.aiScore}</Text>
+          <Text style={styles.debugLine}>Whitelist Cap: {debugInfo.whitelistCap ?? '未觸發'}</Text>
+          <Text style={styles.debugLine}>Confidence: {debugInfo.confidence}</Text>
+          <Text style={styles.debugLine}>Final Score: {debugInfo.finalScore}</Text>
+          <Text style={styles.debugLine}>Risk Level: {debugInfo.riskLevel}</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -259,5 +270,24 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 26,
     fontWeight: 'bold',
+  },
+  debugBox: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 8,
+    gap: 4,
+  },
+  debugTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#888',
+    marginBottom: 4,
+  },
+  debugLine: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
+    lineHeight: 18,
   },
 });

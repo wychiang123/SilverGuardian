@@ -184,6 +184,15 @@ export default function ScanScreen({ navigation }: Props) {
         evidenceLow: aiResult.evidence_low,
         explanation: aiResult.explanation,
         conclusion: aiResult.conclusion,
+        debugInfo: {
+          ocrPreview: (aiResult.ocr_text ?? '').slice(0, 50),
+          ruleScore: rule.score,
+          aiScore: aiResult.ai_score,
+          whitelistCap: rule.whitelistCap,
+          confidence: aiResult.confidence,
+          finalScore,
+          riskLevel,
+        },
       });
     } catch (error: unknown) {
       const axiosError = error as {
