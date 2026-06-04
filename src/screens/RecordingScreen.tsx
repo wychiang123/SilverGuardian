@@ -245,20 +245,6 @@ export default function RecordingScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.tabIcon}>🏠</Text>
-          <Text style={styles.tabText}>首頁</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('History')}>
-          <Text style={styles.tabIcon}>📋</Text>
-          <Text style={styles.tabText}>記錄</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('Settings')}>
-          <Text style={styles.tabIcon}>⚙️</Text>
-          <Text style={styles.tabText}>設定</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -299,7 +285,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 32,
-    paddingBottom: 100,
+    paddingBottom: 32,
     gap: 28,
   },
   instruction: {
@@ -366,29 +352,5 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#444',
     lineHeight: 36,
-  },
-  tabBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingVertical: 8,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  tabIcon: {
-    fontSize: 28,
-    marginBottom: 4,
-  },
-  tabText: {
-    fontSize: 18,
-    color: '#333',
   },
 });
