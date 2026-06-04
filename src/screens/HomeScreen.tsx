@@ -48,10 +48,6 @@ export default function HomeScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.tabBar}>
-        <TouchableOpacity style={styles.tab}>
-          <Text style={styles.tabIcon}>🏠</Text>
-          <Text style={styles.tabText}>首頁</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('History')}>
           <Text style={styles.tabIcon}>📋</Text>
           <Text style={styles.tabText}>記錄</Text>
