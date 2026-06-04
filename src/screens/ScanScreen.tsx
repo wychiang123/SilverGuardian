@@ -16,6 +16,7 @@ import RNFS from 'react-native-fs';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../App';
 import { analyzeScamImage } from '../services/gptApi';
+import { checkRateLimit } from '../services/rateLimitService';
 
 type ScanScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Scan'>;
 
@@ -40,6 +41,7 @@ export default function ScanScreen({ navigation }: Props) {
     try {
       const base64 =
         asset.base64 ?? (await RNFS.readFile(asset.uri.replace('file://', ''), 'base64'));
+      await checkRateLimit();
       const result = await analyzeScamImage(base64);
       navigation.navigate('Result', result);
     } catch (error: unknown) {
@@ -47,6 +49,10 @@ export default function ScanScreen({ navigation }: Props) {
         message?: string;
         response?: { status?: number; data?: unknown };
       };
+      if (!axiosError.response) {
+        Alert.alert('提示', axiosError.message ?? '發生未知錯誤');
+        return;
+      }
       console.error('[ScanScreen] analyzeScamImage error:', axiosError.message);
       console.error('[ScanScreen] error.response.status:', axiosError.response?.status);
       console.error('[ScanScreen] error.response.data:', JSON.stringify(axiosError.response?.data, null, 2));

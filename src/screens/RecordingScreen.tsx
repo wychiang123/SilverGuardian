@@ -19,6 +19,7 @@ import { classifyVoiceInput } from '../services/gptApi';
 import type { VoiceClassifyResult } from '../services/gptApi';
 import { saveRecord } from '../services/storageService';
 import { saveToCalendar } from '../services/calendarService';
+import { checkRateLimit } from '../services/rateLimitService';
 
 // @ts-ignore
 import AudioRecord from 'react-native-audio-record';
@@ -160,6 +161,7 @@ export default function RecordingScreen({ navigation }: Props) {
       console.log('[RecordingScreen] audioFile path:', audioFile);
 
       setProcessingLabel('辨識中，請稍候...');
+      await checkRateLimit();
       const text = await transcribeAudio(audioFile);
       console.log('[RecordingScreen] transcription result:', text);
       setTranscript(text);
@@ -174,6 +176,10 @@ export default function RecordingScreen({ navigation }: Props) {
         message?: string;
         response?: { status?: number; data?: unknown };
       };
+      if (!axiosError.response) {
+        Alert.alert('提示', axiosError.message ?? '發生未知錯誤');
+        return;
+      }
       console.error('[RecordingScreen] error:', axiosError.message);
       console.error('[RecordingScreen] error.response.status:', axiosError.response?.status);
       console.error('[RecordingScreen] error.response.data:', JSON.stringify(axiosError.response?.data, null, 2));

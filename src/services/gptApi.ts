@@ -34,7 +34,7 @@ export async function analyzeScamImage(imageBase64: string): Promise<GptResult> 
   const response = await axios.post<ChatCompletionResponse>(
     'https://api.openai.com/v1/chat/completions',
     {
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
@@ -47,6 +47,7 @@ export async function analyzeScamImage(imageBase64: string): Promise<GptResult> 
               type: 'image_url',
               image_url: {
                 url: `data:image/jpeg;base64,${imageBase64}`,
+                detail: 'low',
               },
             },
             {
@@ -95,7 +96,7 @@ export async function classifyVoiceInput(text: string): Promise<VoiceClassifyRes
   const response = await axios.post<ChatCompletionResponse>(
     'https://api.openai.com/v1/chat/completions',
     {
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
         { role: 'user', content: text },
