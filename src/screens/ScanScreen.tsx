@@ -109,7 +109,19 @@ function computeFinalResult(
     (!hasHighRiskKeyword && ai.confidence < 40);
 
   if (isInsufficientInfo) {
-    return { riskLevel: '資訊不足', finalScore: Math.round((ruleScore + ai.ai_score) / 2) };
+    const result = { riskLevel: '資訊不足' as RiskLevel, finalScore: Math.round((ruleScore + ai.ai_score) / 2) };
+    console.log(
+      `=== 詐騙分析計算過程 ===\n` +
+      `OCR: ${(ai.ocr_text ?? '').slice(0, 50)}\n` +
+      `Rule Score: ${ruleScore}\n` +
+      `AI Score: ${ai.ai_score}\n` +
+      `Whitelist Cap: ${whitelistCap ?? '未觸發'}\n` +
+      `Confidence: ${ai.confidence}\n` +
+      `Final Score: ${result.finalScore}\n` +
+      `Risk Level: ${result.riskLevel}\n` +
+      `========================`,
+    );
+    return result;
   }
 
   // Unified: finalScore = average of rule + AI, riskLevel always derived from finalScore
@@ -120,7 +132,19 @@ function computeFinalResult(
     finalScore = Math.min(finalScore, whitelistCap);
   }
 
-  return { riskLevel: scoreToLevel(finalScore), finalScore };
+  const result = { riskLevel: scoreToLevel(finalScore), finalScore };
+  console.log(
+    `=== 詐騙分析計算過程 ===\n` +
+    `OCR: ${(ai.ocr_text ?? '').slice(0, 50)}\n` +
+    `Rule Score: ${ruleScore}\n` +
+    `AI Score: ${ai.ai_score}\n` +
+    `Whitelist Cap: ${whitelistCap ?? '未觸發'}\n` +
+    `Confidence: ${ai.confidence}\n` +
+    `Final Score: ${result.finalScore}\n` +
+    `Risk Level: ${result.riskLevel}\n` +
+    `========================`,
+  );
+  return result;
 }
 
 type ScanScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Scan'>;
