@@ -44,7 +44,12 @@ const WHITELIST_GROUPS: { keywords: string[]; score: number }[] = [
   { keywords: ['水電費', '電信帳單', '電費通知', '水費通知', '瓦斯帳單'], score: -35 },
 ];
 
-function runRuleEngine(text: string): number {
+interface RuleEngineResult {
+  score: number;
+  whitelistCap: number | null;
+}
+
+function runRuleEngine(text: string): RuleEngineResult {
   let score = 0;
   let hasWhitelistMatch = false;
 
@@ -63,31 +68,43 @@ function runRuleEngine(text: string): number {
     }
   }
 
-  // Whitelist cap: legitimate pattern found + no high-risk anchor → max 25
-  if (hasWhitelistMatch && !hasHighRiskAnchor) {
-    score = Math.min(score, 25);
+  const whitelistCap = (hasWhitelistMatch && !hasHighRiskAnchor) ? 25 : null;
+  if (whitelistCap !== null) {
+    score = Math.min(score, whitelistCap);
   }
 
-  return Math.max(0, Math.min(score, 100));
+  return { score: Math.max(0, Math.min(score, 100)), whitelistCap };
+}
+
+function scoreToLevel(score: number): RiskLevel {
+  if (score >= 60) return '高風險';
+  if (score >= 30) return '中風險';
+  return '低風險';
 }
 
 function computeFinalResult(
-  ruleScore: number,
+  rule: RuleEngineResult,
   ai: ScamAnalysisResult,
 ): { riskLevel: RiskLevel; finalScore: number } {
-  // 資訊不足 trigger: weak rule signal + low AI confidence
+  const { score: ruleScore, whitelistCap } = rule;
+
+  // 資訊不足: independent triggers, not derived from score thresholds
   if (ruleScore < 20 && ai.confidence < 50) {
     return { riskLevel: '資訊不足', finalScore: Math.round((ruleScore + ai.ai_score) / 2) };
   }
-  if (ruleScore >= 60) {
-    return { riskLevel: '高風險', finalScore: Math.min(Math.round((ruleScore + ai.ai_score) / 2), 100) };
+  if (ai.risk_level === '資訊不足' && ruleScore < 30) {
+    return { riskLevel: '資訊不足', finalScore: Math.round((ruleScore + ai.ai_score) / 2) };
   }
-  if (ruleScore >= 30) {
-    const finalScore = Math.round((ruleScore + ai.ai_score) / 2);
-    const level: RiskLevel = finalScore >= 70 ? '高風險' : finalScore >= 40 ? '中風險' : '低風險';
-    return { riskLevel: level, finalScore };
+
+  // Unified: finalScore = average of rule + AI, riskLevel always derived from finalScore
+  let finalScore = Math.min(Math.round((ruleScore + ai.ai_score) / 2), 100);
+
+  // Whitelist cap propagates to finalScore — not just ruleScore
+  if (whitelistCap !== null) {
+    finalScore = Math.min(finalScore, whitelistCap);
   }
-  return { riskLevel: ai.risk_level, finalScore: ai.ai_score };
+
+  return { riskLevel: scoreToLevel(finalScore), finalScore };
 }
 
 type ScanScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Scan'>;
@@ -116,8 +133,8 @@ export default function ScanScreen({ navigation }: Props) {
       await checkRateLimit();
       const aiResult = await analyzeScamImage(base64);
       // Rule engine runs on OCR text only — fully independent of GPT analysis output
-      const ruleScore = runRuleEngine(aiResult.ocr_text ?? '');
-      const { riskLevel, finalScore } = computeFinalResult(ruleScore, aiResult);
+      const rule = runRuleEngine(aiResult.ocr_text ?? '');
+      const { riskLevel, finalScore } = computeFinalResult(rule, aiResult);
       navigation.navigate('Result', {
         riskLevel,
         finalScore,
