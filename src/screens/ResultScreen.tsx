@@ -80,6 +80,16 @@ export default function ResultScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
+        {confidence < 50 && (
+          <View style={styles.lowConfidenceBox}>
+            <Text style={styles.lowConfidenceTitle}>⚠️ AI 目前無法確認</Text>
+            <Text style={styles.lowConfidenceItem}>• 請勿匯款或轉帳給陌生人</Text>
+            <Text style={styles.lowConfidenceItem}>• 請勿提供個人資料或驗證碼</Text>
+            <Text style={styles.lowConfidenceItem}>• 請與家人或親友討論確認</Text>
+            <Text style={styles.lowConfidenceItem}>• 直接聯絡官方客服查證</Text>
+          </View>
+        )}
+
         {needHumanReview && (
           <View style={styles.humanReviewBox}>
             <Text style={styles.humanReviewText}>🧑‍⚖️ 建議人工確認</Text>
@@ -164,6 +174,24 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
     gap: 16,
+  },
+  lowConfidenceBox: {
+    backgroundColor: '#e65100',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 6,
+  },
+  lowConfidenceTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  lowConfidenceItem: {
+    fontSize: 19,
+    color: '#ffffff',
+    lineHeight: 30,
   },
   humanReviewBox: {
     backgroundColor: '#f57f17',

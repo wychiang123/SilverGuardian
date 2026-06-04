@@ -21,30 +21,64 @@ import { checkRateLimit } from '../services/rateLimitService';
 
 type RiskLevel = '高風險' | '中風險' | '低風險' | '資訊不足';
 
-const RULE_GROUPS: { keywords: string[]; score: number }[] = [
-  { keywords: ['匯款', '轉帳', 'ATM'], score: 40 },
-  { keywords: ['保證獲利', '保證賺錢', '穩賺'], score: 35 },
-  { keywords: ['假冒銀行', '假冒檢警', '假冒政府'], score: 40 },
-  { keywords: ['驗證碼', '信用卡資料', '帳戶密碼'], score: 35 },
-  { keywords: ['中獎', '領獎', '手續費'], score: 30 },
-  { keywords: ['投資群組', '加入LINE群', '高報酬'], score: 20 },
-  { keywords: ['不明連結', '點擊連結'], score: 20 },
+// Recalibrated high-risk groups (investment keywords alone excluded)
+const HIGH_RISK_GROUPS: { keywords: string[]; score: number }[] = [
+  { keywords: ['ATM解除分期', '誤設分期', '解除分期付款'], score: 70 },
+  { keywords: ['匯款', '轉帳'], score: 60 },
+  { keywords: ['驗證碼', '個資蒐集', '帳戶密碼', '身份證字號'], score: 55 },
+  { keywords: ['假冒銀行', '假冒檢警', '假冒政府', '冒充警察', '冒充銀行'], score: 60 },
+  { keywords: ['保證獲利', '保證賺錢', '穩賺', '零風險獲利'], score: 50 },
+  { keywords: ['中獎', '領獎', '手續費'], score: 40 },
+];
+
+// Anchors: if present, whitelist cap is bypassed
+const HIGH_RISK_ANCHORS = ['匯款', '轉帳', 'ATM', '驗證碼', '假冒', '冒充'];
+
+// Whitelist groups (negative scores — legitimate message patterns)
+const WHITELIST_GROUPS: { keywords: string[]; score: number }[] = [
+  { keywords: ['刷卡消費', '消費通知', '帳單通知', '消費明細', '信用卡帳單'], score: -40 },
+  { keywords: ['門診提醒', '掛號通知', '醫院通知', '看診提醒', '回診提醒'], score: -40 },
+  { keywords: ['物流通知', '包裹到達', '配送通知', '到貨通知', '取件通知'], score: -30 },
+  { keywords: ['會議通知', '公司通知', '學校通知', '課程通知', '行程提醒'], score: -30 },
+  { keywords: ['好久不見', '最近好嗎', '吃飯了嗎', '在哪裡呢'], score: -30 },
+  { keywords: ['水電費', '電信帳單', '電費通知', '水費通知', '瓦斯帳單'], score: -35 },
 ];
 
 function runRuleEngine(text: string): number {
   let score = 0;
-  for (const group of RULE_GROUPS) {
+  let hasWhitelistMatch = false;
+
+  for (const group of HIGH_RISK_GROUPS) {
     if (group.keywords.some(kw => text.includes(kw))) {
       score += group.score;
     }
   }
-  return Math.min(score, 100);
+
+  const hasHighRiskAnchor = HIGH_RISK_ANCHORS.some(kw => text.includes(kw));
+
+  for (const group of WHITELIST_GROUPS) {
+    if (group.keywords.some(kw => text.includes(kw))) {
+      score += group.score;
+      hasWhitelistMatch = true;
+    }
+  }
+
+  // Whitelist cap: legitimate pattern found + no high-risk anchor → max 25
+  if (hasWhitelistMatch && !hasHighRiskAnchor) {
+    score = Math.min(score, 25);
+  }
+
+  return Math.max(0, Math.min(score, 100));
 }
 
 function computeFinalResult(
   ruleScore: number,
   ai: ScamAnalysisResult,
 ): { riskLevel: RiskLevel; finalScore: number } {
+  // 資訊不足 trigger: weak rule signal + low AI confidence
+  if (ruleScore < 20 && ai.confidence < 50) {
+    return { riskLevel: '資訊不足', finalScore: Math.round((ruleScore + ai.ai_score) / 2) };
+  }
   if (ruleScore >= 60) {
     return { riskLevel: '高風險', finalScore: Math.min(Math.round((ruleScore + ai.ai_score) / 2), 100) };
   }
@@ -83,11 +117,7 @@ export default function ScanScreen({ navigation }: Props) {
       const aiResult = await analyzeScamImage(base64);
       // Rule engine runs on OCR text only — fully independent of GPT analysis output
       const ruleScore = runRuleEngine(aiResult.ocr_text ?? '');
-      // confidence < 50: GPT itself is unsure, downgrade to 資訊不足
-      const effectiveAiResult = aiResult.confidence < 50
-        ? { ...aiResult, risk_level: '資訊不足' as const, ai_score: Math.min(aiResult.ai_score, 30) }
-        : aiResult;
-      const { riskLevel, finalScore } = computeFinalResult(ruleScore, effectiveAiResult);
+      const { riskLevel, finalScore } = computeFinalResult(ruleScore, aiResult);
       navigation.navigate('Result', {
         riskLevel,
         finalScore,
