@@ -81,12 +81,18 @@ export default function ScanScreen({ navigation }: Props) {
         asset.base64 ?? (await RNFS.readFile(asset.uri.replace('file://', ''), 'base64'));
       await checkRateLimit();
       const aiResult = await analyzeScamImage(base64);
-      const searchText = [...aiResult.evidence_high, aiResult.explanation, aiResult.conclusion].join(' ');
-      const ruleScore = runRuleEngine(searchText);
-      const { riskLevel, finalScore } = computeFinalResult(ruleScore, aiResult);
+      // Rule engine runs on OCR text only — fully independent of GPT analysis output
+      const ruleScore = runRuleEngine(aiResult.ocr_text ?? '');
+      // confidence < 50: GPT itself is unsure, downgrade to 資訊不足
+      const effectiveAiResult = aiResult.confidence < 50
+        ? { ...aiResult, risk_level: '資訊不足' as const, ai_score: Math.min(aiResult.ai_score, 30) }
+        : aiResult;
+      const { riskLevel, finalScore } = computeFinalResult(ruleScore, effectiveAiResult);
       navigation.navigate('Result', {
         riskLevel,
         finalScore,
+        confidence: aiResult.confidence,
+        needHumanReview: aiResult.need_human_review,
         evidenceHigh: aiResult.evidence_high,
         evidenceLow: aiResult.evidence_low,
         explanation: aiResult.explanation,

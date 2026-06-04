@@ -47,7 +47,7 @@ const NOTIFY_LABEL: Record<NotifyStatus, string> = {
 };
 
 export default function ResultScreen({ navigation, route }: Props) {
-  const { riskLevel, finalScore, evidenceHigh, evidenceLow, explanation, conclusion } = route.params;
+  const { riskLevel, finalScore, confidence, needHumanReview, evidenceHigh, evidenceLow, explanation, conclusion } = route.params;
   const [notifyStatus, setNotifyStatus] = useState<NotifyStatus>('sending');
 
   const cfg = RISK_CONFIG[riskLevel] ?? RISK_CONFIG['資訊不足'];
@@ -73,12 +73,20 @@ export default function ResultScreen({ navigation, route }: Props) {
         <Text style={styles.riskIcon}>{cfg.icon}</Text>
         <Text style={styles.riskLabel}>{cfg.label}</Text>
         <Text style={styles.riskScore}>風險分數：{finalScore} / 100</Text>
+        <Text style={styles.confidenceText}>AI 信心度：{confidence}%</Text>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
+        {needHumanReview && (
+          <View style={styles.humanReviewBox}>
+            <Text style={styles.humanReviewText}>🧑‍⚖️ 建議人工確認</Text>
+            <Text style={styles.humanReviewSub}>AI 判斷有不確定性，建議請家人或專業人士再確認</Text>
+          </View>
+        )}
+
         {isHighRisk && (
           <View style={[styles.notifyBox, { backgroundColor: cfg.headerBg }]}>
             <Text style={styles.notifyText}>{NOTIFY_LABEL[notifyStatus]}</Text>
@@ -148,10 +156,31 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontWeight: '600',
   },
+  confidenceText: {
+    fontSize: 20,
+    color: 'rgba(255,255,255,0.75)',
+  },
   body: {
     padding: 20,
     paddingBottom: 40,
     gap: 16,
+  },
+  humanReviewBox: {
+    backgroundColor: '#f57f17',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  humanReviewText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  humanReviewSub: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 26,
   },
   notifyBox: {
     borderRadius: 12,

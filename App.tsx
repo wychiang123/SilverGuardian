@@ -15,6 +15,8 @@ export type RootStackParamList = {
   Result: {
     riskLevel: '高風險' | '中風險' | '低風險' | '資訊不足';
     finalScore: number;
+    confidence: number;
+    needHumanReview: boolean;
     evidenceHigh: string[];
     evidenceLow: string[];
     explanation: string;

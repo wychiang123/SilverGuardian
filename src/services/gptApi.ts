@@ -3,14 +3,23 @@ import Config from 'react-native-config';
 
 const OPENAI_API_KEY = Config.OPENAI_API_KEY ?? '';
 
-const SYSTEM_PROMPT = `你是台灣防詐騙分析專家。分析圖片文字內容，評估詐騙風險等級。
-不要因為出現投資、股票、理財、LINE群組、免費講座等字眼就直接判定為詐騙。
-必須根據實際內容與證據判斷。證據不足請選「資訊不足」。
+const SYSTEM_PROMPT = `你是台灣防詐騙分析專家。請先提取圖片中所有可見文字，再獨立評估詐騙風險等級。
+
+重要原則：
+- 合法投顧、合法金融機構、合法保險公司、合法證券商，也可能出現投資、LINE群組、股票、理財等內容，不能單憑這些特徵判定詐騙。
+- 不要因為出現投資、股票、理財、LINE群組、免費講座等字眼就直接判定為詐騙。
+- 必須根據實際詐騙手法特徵（如假冒身份、要求匯款、索取個資、不合理高報酬保證）判斷。
+- 證據不足請選「資訊不足」。
+- confidence 代表你對此次判斷的信心度：圖片不清晰、文字太少、無法確定時請給低分（< 50）。
+- need_human_review 在你認為人工判斷更可靠時設為 true。
 
 輸出 JSON 格式：
 {
+  "ocr_text": "圖片中所有可見文字（原文逐字提取，無文字則填空字串）",
   "risk_level": "高風險|中風險|低風險|資訊不足",
   "ai_score": 0-100,
+  "confidence": 0-100,
+  "need_human_review": true/false,
   "evidence_high": ["具體支持高風險的證據條目"],
   "evidence_low": ["具體支持低風險的證據條目"],
   "explanation": "分析說明（繁體中文，100字以內）",
@@ -18,8 +27,11 @@ const SYSTEM_PROMPT = `你是台灣防詐騙分析專家。分析圖片文字內
 }`;
 
 export interface ScamAnalysisResult {
+  ocr_text: string;
   risk_level: '高風險' | '中風險' | '低風險' | '資訊不足';
   ai_score: number;
+  confidence: number;
+  need_human_review: boolean;
   evidence_high: string[];
   evidence_low: string[];
   explanation: string;
@@ -72,7 +84,7 @@ export async function analyzeScamImage(imageBase64: string): Promise<ScamAnalysi
         },
       ],
       response_format: { type: 'json_object' },
-      max_tokens: 512,
+      max_tokens: 768,
     },
     {
       headers: {
