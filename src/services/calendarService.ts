@@ -119,6 +119,11 @@ export async function saveToCalendar(
       startDate,
       endDate,
       allDay: isAllDay,
+      alarms: [
+        { date: -180 }, // 事件前 3 小時
+        { date: -30 },  // 事件前 30 分鐘
+        { date: 0 },    // 事件開始時
+      ],
     });
     await alertAsync(
       '[Debug] 步驟5：saveEvent 成功',
