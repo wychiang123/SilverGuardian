@@ -117,11 +117,26 @@ export async function analyzeScamImage(imageBase64: string): Promise<ScamAnalysi
   return JSON.parse(content) as ScamAnalysisResult;
 }
 
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function buildClassifySystemPrompt(): string {
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
+  const today = toLocalDateStr(now);
   const weekDay = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
-  return `今天日期是 ${today}，星期${weekDay}。請根據今天日期計算相對日期（下禮拜、明天、後天等）。
+
+  // daysFromMonday: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
+  const daysFromMonday = (now.getDay() + 6) % 7;
+  const nextMon = new Date(now);
+  nextMon.setDate(now.getDate() + (7 - daysFromMonday));
+  const nextMondayStr = toLocalDateStr(nextMon);
+
+  return `今天是 ${today}，星期${weekDay}。
+「下禮拜」= 下一週，下週一是 ${nextMondayStr}。
+「下禮拜一」= ${nextMondayStr}（不是這週的週一，是下一週的週一）。
+「下禮拜X」= 從 ${nextMondayStr} 起算對應的星期。
+「明天」「後天」「下週」等相對日期，請以今天 ${today} 為基準計算，格式一律 YYYY-MM-DD。
 
 你是台灣長輩的生活助手，請分析以下語音輸入屬於哪種類型，並提取關鍵資訊。
 回傳 JSON 格式：
