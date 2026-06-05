@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  BackHandler,
 } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../../App';
 import { notifyFamily } from '../services/notifyService';
@@ -52,6 +54,16 @@ export default function ResultScreen({ navigation, route }: Props) {
 
   const cfg = RISK_CONFIG[riskLevel] ?? RISK_CONFIG['資訊不足'];
   const isHighRisk = riskLevel === '高風險';
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        navigation.navigate('Home');
+        return true;
+      });
+      return () => sub.remove();
+    }, [navigation]),
+  );
 
   useEffect(() => {
     if (!isHighRisk) return;
