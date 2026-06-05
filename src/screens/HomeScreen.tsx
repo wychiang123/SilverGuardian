@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,10 @@ import {
   SafeAreaView,
   StatusBar,
   BackHandler,
+  Alert,
+  Linking,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../App';
@@ -18,6 +22,44 @@ interface Props {
 }
 
 export default function HomeScreen({ navigation }: Props) {
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const requestAllPermissions = async () => {
+      const statuses = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        PermissionsAndroid.PERMISSIONS.READ_CALENDAR,
+        PermissionsAndroid.PERMISSIONS.WRITE_CALENDAR,
+      ]);
+
+      const denied: string[] = [];
+      if (statuses[PermissionsAndroid.PERMISSIONS.CAMERA] !== PermissionsAndroid.RESULTS.GRANTED) {
+        denied.push('📷 相機（拍照檢查詐騙訊息）');
+      }
+      if (statuses[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] !== PermissionsAndroid.RESULTS.GRANTED) {
+        denied.push('🎙️ 麥克風（語音記帳與備忘）');
+      }
+      if (
+        statuses[PermissionsAndroid.PERMISSIONS.READ_CALENDAR] !== PermissionsAndroid.RESULTS.GRANTED ||
+        statuses[PermissionsAndroid.PERMISSIONS.WRITE_CALENDAR] !== PermissionsAndroid.RESULTS.GRANTED
+      ) {
+        denied.push('📅 行事曆（記錄重要日程）');
+      }
+
+      if (denied.length === 0) return;
+
+      Alert.alert(
+        '需要開啟授權',
+        `為了讓 APP 正常運作，請允許以下權限：\n\n${denied.join('\n')}\n\n請點「前往設定」，再開啟所有權限。`,
+        [
+          { text: '前往設定', onPress: () => Linking.openSettings() },
+          { text: '稍後再說', style: 'cancel' },
+        ],
+      );
+    };
+    requestAllPermissions();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#1b5e20" barStyle="light-content" />

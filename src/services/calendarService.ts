@@ -1,4 +1,4 @@
-import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
 // @ts-ignore
 import RNCalendarEvents from 'react-native-calendar-events';
 
@@ -29,8 +29,11 @@ async function requestCalendarPermission(): Promise<boolean> {
     ) {
       Alert.alert(
         '需要行事曆權限',
-        '行事曆權限已被永久拒絕，請到手機設定 > 應用程式 > SilverGuardian > 權限，手動開啟行事曆權限。',
-        [{ text: '好的' }],
+        '行事曆權限已被拒絕，無法寫入日程。請點「前往設定」，再開啟行事曆權限。',
+        [
+          { text: '前往設定', onPress: () => Linking.openSettings() },
+          { text: '取消', style: 'cancel' },
+        ],
       );
       return false;
     }
