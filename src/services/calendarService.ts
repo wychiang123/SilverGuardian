@@ -2,24 +2,32 @@ import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
 // @ts-ignore
 import RNCalendarEvents from 'react-native-calendar-events';
 
+// Debug helper — wraps Alert in a Promise so each popup blocks until user taps OK
+function alertAsync(title: string, message: string): Promise<void> {
+  return new Promise(resolve => {
+    Alert.alert(title, message, [{ text: 'OK', onPress: resolve }]);
+  });
+}
+
 async function requestCalendarPermission(): Promise<boolean> {
   if (Platform.OS === 'android') {
-    // Step 1: check current status — avoids unnecessary dialog
+    // Step 1: check current status
     const readCheck = await PermissionsAndroid.check(
       PermissionsAndroid.PERMISSIONS.READ_CALENDAR,
     );
     const writeCheck = await PermissionsAndroid.check(
       PermissionsAndroid.PERMISSIONS.WRITE_CALENDAR,
     );
-    console.log('[Calendar] check READ_CALENDAR:', readCheck, '| WRITE_CALENDAR:', writeCheck);
+    await alertAsync(
+      '[Debug] 步驟1：權限現況',
+      `READ_CALENDAR: ${readCheck}\nWRITE_CALENDAR: ${writeCheck}`,
+    );
 
     if (readCheck && writeCheck) {
-      console.log('[Calendar] 行事曆權限已授權，跳過請求');
       return true;
     }
 
     // Step 2: not granted — request
-    console.log('[Calendar] 行事曆權限不足，開始請求...');
     const readGranted = await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.READ_CALENDAR,
       {
@@ -29,8 +37,6 @@ async function requestCalendarPermission(): Promise<boolean> {
         buttonNegative: '拒絕',
       },
     );
-    console.log('[Calendar] READ_CALENDAR 請求結果:', readGranted);
-
     const writeGranted = await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.WRITE_CALENDAR,
       {
@@ -40,13 +46,15 @@ async function requestCalendarPermission(): Promise<boolean> {
         buttonNegative: '拒絕',
       },
     );
-    console.log('[Calendar] WRITE_CALENDAR 請求結果:', writeGranted);
+    await alertAsync(
+      '[Debug] 步驟2：權限請求結果',
+      `READ_CALENDAR: ${readGranted}\nWRITE_CALENDAR: ${writeGranted}`,
+    );
 
     if (
       readGranted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ||
       writeGranted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN
     ) {
-      console.log('[Calendar] 權限被永久拒絕 (NEVER_ASK_AGAIN)');
       Alert.alert(
         '需要行事曆權限',
         '行事曆權限已被拒絕，無法寫入日程。請點「前往設定」，再開啟行事曆權限。',
@@ -61,13 +69,12 @@ async function requestCalendarPermission(): Promise<boolean> {
     const granted =
       readGranted === PermissionsAndroid.RESULTS.GRANTED &&
       writeGranted === PermissionsAndroid.RESULTS.GRANTED;
-    console.log('[Calendar] 最終授權結果:', granted);
     return granted;
   }
 
   // iOS
   const status = await RNCalendarEvents.requestPermissions();
-  console.log('[Calendar] iOS requestPermissions 結果:', status);
+  await alertAsync('[Debug] iOS 權限結果', `status: ${status}`);
   return status === 'authorized';
 }
 
@@ -76,18 +83,17 @@ export async function saveToCalendar(
   date: string,
   time: string,
 ): Promise<boolean> {
-  console.log('[Calendar] saveToCalendar 開始 | title:', title, '| date:', date, '| time:', time);
-
   const hasPermission = await requestCalendarPermission();
-  console.log('[Calendar] 權限確認結果:', hasPermission);
+  await alertAsync(
+    '[Debug] 步驟3：權限確認',
+    `hasPermission: ${hasPermission}`,
+  );
 
   if (!hasPermission) {
-    console.log('[Calendar] 無行事曆權限，取消寫入');
     return false;
   }
 
   const isAllDay = !time || time === '未指定';
-  console.log('[Calendar] isAllDay:', isAllDay);
 
   let startDate: string;
   let endDate: string;
@@ -103,7 +109,10 @@ export async function saveToCalendar(
     endDate = end.toISOString();
   }
 
-  console.log('[Calendar] startDate:', startDate, '| endDate:', endDate);
+  await alertAsync(
+    '[Debug] 步驟4：即將寫入行事曆',
+    `title: ${title}\nstartDate: ${startDate}\nendDate: ${endDate}\nallDay: ${isAllDay}`,
+  );
 
   try {
     const result = await RNCalendarEvents.saveEvent(title, {
@@ -111,10 +120,16 @@ export async function saveToCalendar(
       endDate,
       allDay: isAllDay,
     });
-    console.log('[Calendar] saveEvent 成功 | result:', result);
+    await alertAsync(
+      '[Debug] 步驟5：saveEvent 成功',
+      `result: ${JSON.stringify(result)}`,
+    );
     return true;
   } catch (err) {
-    console.error('[Calendar] saveEvent 失敗:', err);
+    const msg = err instanceof Error
+      ? `${err.name}: ${err.message}\n\n${err.stack ?? ''}`
+      : JSON.stringify(err);
+    await alertAsync('[Debug] 步驟5：saveEvent 失敗', msg);
     throw err;
   }
 }
