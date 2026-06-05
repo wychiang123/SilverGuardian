@@ -117,11 +117,11 @@ export async function analyzeScamImage(imageBase64: string): Promise<ScamAnalysi
   return JSON.parse(content) as ScamAnalysisResult;
 }
 
-const CLASSIFY_SYSTEM_PROMPT = (() => {
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const weekDay = ['日', '一', '二', '三', '四', '五', '六'][today.getDay()];
-  return `今天日期是 ${todayStr}，星期${weekDay}。請根據今天日期計算相對日期（下禮拜、明天、後天等）。
+function buildClassifySystemPrompt(): string {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const weekDay = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
+  return `今天日期是 ${today}，星期${weekDay}。請根據今天日期計算相對日期（下禮拜、明天、後天等）。
 
 你是台灣長輩的生活助手，請分析以下語音輸入屬於哪種類型，並提取關鍵資訊。
 回傳 JSON 格式：
@@ -135,7 +135,7 @@ const CLASSIFY_SYSTEM_PROMPT = (() => {
   "summary": 一句話摘要給長輩確認，使用繁體中文
 }
 請務必只回傳 JSON，不要加任何說明文字。`;
-})();
+}
 
 export async function classifyVoiceInput(text: string): Promise<VoiceClassifyResult> {
   const response = await axios.post<ChatCompletionResponse>(
@@ -143,7 +143,7 @@ export async function classifyVoiceInput(text: string): Promise<VoiceClassifyRes
     {
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
+        { role: 'system', content: buildClassifySystemPrompt() },
         { role: 'user', content: text },
       ],
       response_format: { type: 'json_object' },
