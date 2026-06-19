@@ -117,25 +117,53 @@ export async function analyzeScamImage(imageBase64: string): Promise<ScamAnalysi
   return JSON.parse(content) as ScamAnalysisResult;
 }
 
-const CLASSIFY_SYSTEM_PROMPT = (() => {
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const weekDay = ['日', '一', '二', '三', '四', '五', '六'][today.getDay()];
-  return `今天日期是 ${todayStr}，星期${weekDay}。請根據今天日期計算相對日期（下禮拜、明天、後天等）。
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
-你是台灣長輩的生活助手，請分析以下語音輸入屬於哪種類型，並提取關鍵資訊。
+function buildClassifySystemPrompt(): string {
+  const now = new Date();
+  const today = toLocalDateStr(now);
+  const weekDay = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
+
+  // daysFromMonday: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
+  const daysFromMonday = (now.getDay() + 6) % 7;
+  const nextMon = new Date(now);
+  nextMon.setDate(now.getDate() + (7 - daysFromMonday));
+  const nextMondayStr = toLocalDateStr(nextMon);
+
+  const nowHHmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  return `今天是 ${today}，星期${weekDay}，現在時間 ${nowHHmm}。
+「下禮拜」= 下一週，下週一是 ${nextMondayStr}。
+「下禮拜一」= ${nextMondayStr}（不是這週的週一，是下一週的週一）。
+「下禮拜X」= 從 ${nextMondayStr} 起算對應的星期。
+「明天」「後天」「下週」等相對日期，請以今天 ${today} 為基準計算，格式一律 YYYY-MM-DD。
+「X分鐘後」「X小時後」等相對時間，請以現在 ${nowHHmm} 為基準計算。
+
+你是台灣長輩的生活助手，請分析以下語音輸入屬於哪種類型：
+
+【分類規則】（照優先順序判斷）
+1. 有金額數字 → expense（記帳）
+   例：「吃飯花了一百五」「計程車八十元」
+2. 有具體時間點 → calendar（行事曆）
+   包含：X點、X分、X分鐘後、X小時後、今天下午、明天早上、下週等
+   例：「三分鐘後提醒喝水」「提醒我下午三點開會」「明天早上九點看醫生」
+3. 沒有時間點的提醒、待辦、備註 → memo（備忘）
+   例：「記得買牛奶」「提醒我打電話給女兒」（無具體時間）
+
 回傳 JSON 格式：
 {
   "type": "expense"（記帳）| "memo"（備忘）| "calendar"（行事曆）,
   "amount": 金額數字（記帳才有，純數字不含單位）,
   "category": 類別（記帳：餐費/交通/醫療/購物/其他）,
   "content": 完整備忘內容,
-  "date": 日期（行事曆才有，格式 YYYY-MM-DD，若未提及則用今天）,
-  "time": 時間（行事曆才有，格式 HH:mm，若未提及則省略）,
+  "date": 日期（行事曆才有，格式 YYYY-MM-DD，若未提及則用今天 ${today}）,
+  "time": 時間（行事曆才有，格式 HH:mm，「X分鐘後」請換算成實際時間）,
   "summary": 一句話摘要給長輩確認，使用繁體中文
 }
 請務必只回傳 JSON，不要加任何說明文字。`;
-})();
+}
 
 export async function classifyVoiceInput(text: string): Promise<VoiceClassifyResult> {
   const response = await axios.post<ChatCompletionResponse>(
@@ -143,7 +171,7 @@ export async function classifyVoiceInput(text: string): Promise<VoiceClassifyRes
     {
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
+        { role: 'system', content: buildClassifySystemPrompt() },
         { role: 'user', content: text },
       ],
       response_format: { type: 'json_object' },
